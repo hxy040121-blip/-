@@ -15,4 +15,13 @@ ffmpeg -y -loglevel error -i build/video.mp4 -i build/music.wav \
   -map 0:v -map 1:a -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -c:a aac -b:a 256k -ar 48000 \
   -af "loudnorm=$TARGET:$STATS:linear=true" -movflags +faststart -shortest \
   夙与愿_宣传片.mp4
-echo "完成：夙与愿_宣传片.mp4"
+
+# 分享版：两遍编码压到 30 MB 以内，轻微降噪让胶片颗粒少占码率
+DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 夙与愿_宣传片.mp4)
+VBR=$(python3 -c "print(int(28.5 * 8 * 1024 * 1024 / $DUR / 1000 - 170))")
+ffmpeg -y -loglevel error -i 夙与愿_宣传片.mp4 -vf hqdn3d=1.5:1.5:4:4 -c:v libx264 -preset slower -tune film \
+  -b:v ${VBR}k -maxrate $((VBR * 2))k -bufsize $((VBR * 4))k -pix_fmt yuv420p -pass 1 -passlogfile build/x264 -an -f null /dev/null
+ffmpeg -y -loglevel error -i 夙与愿_宣传片.mp4 -vf hqdn3d=1.5:1.5:4:4 -c:v libx264 -preset slower -tune film \
+  -b:v ${VBR}k -maxrate $((VBR * 2))k -bufsize $((VBR * 4))k -pix_fmt yuv420p -pass 2 -passlogfile build/x264 \
+  -c:a aac -b:a 160k -movflags +faststart 夙与愿_宣传片_分享版.mp4
+echo "完成：夙与愿_宣传片.mp4、夙与愿_宣传片_分享版.mp4"
