@@ -897,15 +897,13 @@ function sceneCard(b) {
   if (b < 39.8 || b > 48.3) return;
   const fc = TL.firstCard;
   const a = win(b, 39.8, 48.3, .3, .4);
-  spot(960, 540, 600, a);
+  spot(1250, 540, 560, a);
   const pin = backOut(clamp((b - fc.inB) / .7));
   let y = lerp(1450, 540, pin);
   let rot = lerp(-.35, .035, pin) + Math.sin(tb(b) * .9) * .012;
   if (b > 47.5) { const k = eIn(inv(47.5, 48.2, b)); y += k * 900; rot += k * .4; }
   const flip = eInOut(clamp((b - fc.flipB) / .45));
-  // 翻面后缓慢推近，画面不停在原地
-  const s = .98 + .14 * eInOut(inv(fc.flipB + .5, 47.5, b));
-  drawCard({ x: 960, y, s, rot, flip, front: fc.front, back: fc.back, frontDesc: CARD_TEXT[fc.front], backDesc: CARD_TEXT[fc.back], numeral: 'I', alpha: a });
+  drawCard({ x: 1250, y, s: .98, rot, flip, front: fc.front, back: fc.back, frontDesc: CARD_TEXT[fc.front], backDesc: CARD_TEXT[fc.back], numeral: 'I', alpha: a });
 }
 
 function sceneFlips(b) {
