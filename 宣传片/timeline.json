@@ -3,90 +3,89 @@
   "fps": 30,
   "width": 1920,
   "height": 1080,
+  "totalBeats": 144,
 
-  "说明": "sections 按顺序排列，每段写长度（拍）。凡带 sec 的条目，b / until / decodeEnd / inB / flipB / tagB / fadeB / coinGone / appear / coinsAppear / times 都是相对该段起点的拍数。",
-
-  "sections": [
-    ["clock", 8], ["intro", 8], ["table", 16], ["mansion", 16], ["host", 8],
-    ["card", 8], ["flips", 8], ["coins", 12], ["commission", 4], ["countdown", 4],
-    ["blackout", 4], ["door", 4], ["body", 4], ["investigate", 8], ["trialOpen", 4],
-    ["debate", 8], ["vote", 8], ["verdict", 4], ["escape", 8], ["names", 8],
-    ["wall", 4], ["wish", 8], ["title", 12]
-  ],
+  "sections": {
+    "clock": [0, 8],
+    "intro": [8, 16],
+    "table": [16, 32],
+    "host": [32, 40],
+    "card": [40, 48],
+    "flips": [48, 56],
+    "commission": [56, 60],
+    "countdown": [60, 64],
+    "blackout": [64, 68],
+    "door": [68, 72],
+    "body": [72, 76],
+    "investigate": [76, 84],
+    "trialOpen": [84, 88],
+    "debate": [88, 96],
+    "vote": [96, 104],
+    "verdict": [104, 108],
+    "escape": [108, 112],
+    "names": [112, 120],
+    "wall": [120, 124],
+    "wish": [124, 132],
+    "title": [132, 144]
+  },
 
   "texts": [
-    {"sec": "intro",       "b": 1,   "until": 4.6,  "style": "narr",  "text": "到达洋馆的过程，没有留下任何记忆。"},
-    {"sec": "mansion",     "b": 1.2, "until": 3.85, "style": "cap",   "text": "没有太阳方向，也没有移动的日影。"},
-    {"sec": "flips",       "b": 0.5, "until": 7.8,  "style": "cap",   "text": "可以公开、隐瞒、冒认身份。"},
-    {"sec": "coins",       "b": 9.6, "until": 11.85,"style": "cap",   "text": "抢夺他人的金币，不受主持人惩罚。"},
-    {"sec": "blackout",    "b": 0.3, "until": 2.2,  "style": "bcast", "text": "由于盲视者的能力，全馆陷入黑暗。", "blip": true},
-    {"sec": "investigate", "b": 2,   "until": 5.9,  "style": "mid",   "text": "已锁的门从里面打开再关上，仍锁着。"},
-    {"sec": "escape",      "b": 0.3, "until": 3.9,  "style": "big",   "y": 170, "text": "真凶逃过本次审判后，继续参加游戏。"},
-    {"sec": "names",       "b": 0.2, "until": 7.8,  "style": "cap",   "text": "愿望只给最后一个活着留在馆里的人，所以一切同盟都有期限。"},
-    {"sec": "wish",        "b": 4,   "until": 7.6,  "style": "gold",  "text": "主持人实现其任何愿望。"}
-  ],
-
-  "placards": [
-    {"sec": "mansion", "b": 4.5,  "decodeEnd": 5.6,  "until": 7.9,  "kind": "label", "text": "EX–01　伊里昂 b「双胸六足兽」"},
-    {"sec": "mansion", "b": 8.6,  "decodeEnd": 9.8,  "until": 11.9, "kind": "woven", "text": "第七王庭 · 纪年四一二"},
-    {"sec": "mansion", "b": 12.8, "decodeEnd": 13.8, "until": 15.9, "kind": "label", "text": "《八位无名观测者》"}
+    {"b": 9,     "until": 12.6, "style": "narr",  "text": "到达洋馆的过程，没有留下任何记忆。"},
+    {"b": 13,    "until": 15.8, "style": "narr",  "text": "每个人都是从一件要紧的事当中被带走的。"},
+    {"b": 48.5,  "until": 51.8, "style": "cap",   "text": "可以公开、隐瞒、冒认身份。"},
+    {"b": 60.5,  "until": 63.9, "style": "cap", "y": 800, "text": "受命者须在二十四小时内造成死亡。"},
+    {"b": 64.3,  "until": 66.2, "style": "bcast", "text": "由于盲视者的能力，全馆陷入黑暗。", "blip": true},
+    {"b": 78,    "until": 81.9, "style": "mid",   "text": "已锁的门从里面打开再关上，仍锁着。"},
+    {"b": 108.3, "until": 111.8,"style": "big", "y": 170, "text": "真凶逃过本次审判后，继续参加游戏。"},
+    {"b": 112.2, "until": 115.8,"style": "cap",   "text": "愿望只给最后一个活着留在馆里的人，所以一切同盟都有期限。"},
+    {"b": 125,   "until": 127.8,"style": "cap",   "text": "仍存活、在馆的人只剩一名时，"},
+    {"b": 128,   "until": 131.6,"style": "gold",  "text": "主持人实现其任何愿望。"}
   ],
 
   "hostLines": [
-    {"sec": "host", "b": 1, "decodeEnd": 4, "until": 7.7, "text": "每个房号各对应一个身份。"}
+    {"b": 33, "decodeEnd": 35, "until": 35.9, "text": "参与者进入洋馆，自由分配房间钥匙。"},
+    {"b": 37, "decodeEnd": 38.6, "until": 39.9, "text": "每个房号各对应一个身份。"}
   ],
 
   "wakeGroups": [
-    {"sec": "table", "b": 0, "clock": "17:01", "seats": [1, 6, 11]},
-    {"sec": "table", "b": 2, "clock": "17:02", "seats": [2, 7, 12]},
-    {"sec": "table", "b": 4, "clock": "17:03", "seats": [3, 8, 13]},
-    {"sec": "table", "b": 6, "clock": "17:04", "seats": [4, 9, 14]},
-    {"sec": "table", "b": 8, "clock": "17:05", "seats": [5, 10, 15]}
+    {"b": 16, "clock": "17:01", "seats": [1, 6, 11]},
+    {"b": 18, "clock": "17:02", "seats": [2, 7, 12]},
+    {"b": 20, "clock": "17:03", "seats": [3, 8, 13]},
+    {"b": 22, "clock": "17:04", "seats": [4, 9, 14]},
+    {"b": 24, "clock": "17:05", "seats": [5, 10, 15]}
   ],
 
-  "firstCard": {"sec": "card", "front": "法官", "back": "典狱长", "inB": 0, "flipB": 2},
+  "firstCard": {"front": "法官", "back": "典狱长", "inB": 40, "flipB": 42},
   "flipCards": [
     ["先知", "盲视者"], ["占卜家", "梦访者"], ["倒吊人", "世界"], ["魔术师", "窃贼"],
     ["圣女", "贞德"], ["白痴", "智者"], ["身怀希望之人", "背负绝望之人"], ["骑士", "国王"]
   ],
-  "flipStart": {"sec": "flips", "b": 0},
+  "flipStartB": 48,
 
-  "coinFlip": {"sec": "coins", "b": 0.8, "until": 3.2},
-  "plaque": {"sec": "coins", "b": 4, "step": 0.36, "rows": [
-    ["一餐，一人份", "100"],
-    ["厨刀级的利刃一把", "80"],
-    ["安眠药十片", "600"],
-    ["手铐一副含钥匙", "600"],
-    ["铁链与挂锁一套", "400"],
-    ["输血一袋，含器材", "2,000"],
-    ["修复身体残疾", "500"],
-    ["退出券一张", "50,000"]
-  ]},
-  "knife": {"sec": "coins", "coinGone": 8.7, "appear": 9.0},
-
-  "clues1": {"sec": "investigate", "b": 0, "step": 0.5, "words": ["铂金钥匙", "落地钟", "五毫升", "三秒"]},
-  "clues2": {"sec": "investigate", "b": 6, "step": 0.25, "words": ["门底缝五毫米", "蔷薇六席", "金币·100", "乌木扶手椅", "墨玉圆盘", "安眠药十片", "磨砂水晶窗", "第七号房"]},
+  "clues1": {"b": 76, "step": 0.5, "words": ["铂金钥匙", "落地钟", "五毫升", "三秒"]},
+  "clues2": {"b": 82, "step": 0.25, "words": ["门底缝五毫米", "蔷薇六席", "金币·100", "乌木扶手椅", "墨玉圆盘", "安眠药十片", "磨砂水晶窗", "第七号房"]},
 
   "debate": [
-    {"sec": "debate", "b": 0,   "seat": 3,  "text": "我是先知。"},
-    {"sec": "debate", "b": 1.5, "seat": 9,  "text": "……我也是先知。"},
-    {"sec": "debate", "b": 3,   "seat": 5,  "text": "那三分钟里，你在哪？"},
-    {"sec": "debate", "b": 4.5, "seat": 14, "text": "我看见了。"},
-    {"sec": "debate", "b": 6,   "seat": 1,  "text": "全馆一片漆黑——你看见了什么？"}
+    {"b": 88, "seat": 3,  "text": "我是先知。"},
+    {"b": 89, "seat": 9,  "text": "……我也是先知。"},
+    {"b": 90, "seat": 12, "text": "钥匙在中途换过手。"},
+    {"b": 91, "seat": 5,  "text": "那三分钟里，你在哪？"},
+    {"b": 92, "seat": 14, "text": "我看见了。"},
+    {"b": 93, "seat": 1,  "text": "全馆一片漆黑——你看见了什么？"},
+    {"b": 94, "seat": 7,  "text": "落地钟被人拨过。"},
+    {"b": 95, "seat": 11, "text": "所以，你的不在场证明不成立。"}
   ],
 
-  "votes": {"sec": "vote", "b": 1, "step": 0.25,
+  "votes": {"b": 97, "step": 0.25,
     "targets": [14, 9, 14, 3, 14, 9, 14, 3, 14, 14, 9, 3, 9, 3, 9]},
   "hiddenMods": [
-    {"sec": "vote", "b": 5.0, "seat": 9,  "delta": 1},
-    {"sec": "vote", "b": 5.5, "seat": 14, "delta": -1}
+    {"b": 101.0, "seat": 9,  "delta": 1},
+    {"b": 101.5, "seat": 14, "delta": -1}
   ],
   "verdictSeat": 9,
-  "verdict": {"sec": "verdict", "b": 1},
+  "verdictB": 105,
 
-  "escapeDesk": {"sec": "escape", "b": 4, "coinsAppear": 5.0, "card": "先知", "coins": 10},
-
-  "names": {"sec": "names", "b": 0, "slow": 0.5, "fast": 0.25, "slowCount": 8,
+  "names": {"b": 112, "slow": 0.5, "fast": 0.25, "slowCount": 8,
     "list": ["L", "夜神月", "江之岛盾子", "贝阿朵莉切", "夏洛克·福尔摩斯", "斑目貘", "蛇喰梦子", "房石阳明",
              "成步堂龙一", "赤木茂", "工藤新一", "右代宫战人", "伊藤开司", "蓝染惣右介", "玛奇玛", "牧濑红莉栖",
              "鬼舞辻无惨", "两面宿傩", "吉尔伽美什", "卫宫切嗣", "宇智波鼬", "迪奥·布兰度", "格里菲斯", "芙莉莲"]},
@@ -97,9 +96,9 @@
            "宇智波佐助", "崔格", "芙莉莲", "阿尔敏·阿诺德", "牧濑红莉栖", "宇智波带土", "卫宫切嗣", "迪奥·布兰度",
            "伊藤开司", "夜神月", "乔尼·乔斯达", "蝴蝶忍", "两面宿傩", "格里菲斯"],
 
-  "seatOff": {"sec": "wish", "order": [3, 12, 5, 7, 9, 1, 10, 6, 15, 2, 11, 4, 13, 8],
-    "times": [0.0, 0.5, 1.0, 1.4, 1.8, 2.1, 2.4, 2.7, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25],
+  "seatOff": {"b": 124, "order": [3, 12, 5, 7, 9, 1, 10, 6, 15, 2, 11, 4, 13, 8], "times":
+    [124.0, 124.5, 125.0, 125.4, 125.8, 126.1, 126.4, 126.7, 127.0, 127.25, 127.5, 127.75, 128.0, 128.25],
     "survivor": 14},
 
-  "title": {"sec": "title", "b": 0, "tagB": 2, "fadeB": 8, "text": "夙与愿", "tag": "谋杀 · 推理 · 辩论 · 审判"}
+  "title": {"b": 132, "tagB": 134, "fadeB": 140, "text": "夙与愿", "tag": "谋杀 · 推理 · 辩论 · 审判"}
 }

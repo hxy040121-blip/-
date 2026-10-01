@@ -2,7 +2,7 @@
 /*
  * 用无头 Chromium 逐帧渲染 scene.html。
  *
- *   node render.js stills 8.2 coins:4.5    按拍导出单帧 JPEG 到 build/stills/（段名:段内拍数 也可以）
+ *   node render.js stills 8.2 16 33.5      按“拍”导出单帧 JPEG 到 build/stills/
  *   node render.js video                   全片分段并行渲染，输出 build/video.mp4（无声）
  *
  * 需要 build/fonts/（见 fetch_fonts.sh）。环境变量 WORKERS 控制并行数。
@@ -19,12 +19,7 @@ const FONT_DIR = path.join(BUILD, 'fonts');
 const TL = JSON.parse(fs.readFileSync(path.join(HERE, 'timeline.json'), 'utf8'));
 const FPS = TL.fps;
 const BEAT = 60 / TL.bpm;
-const STARTS = {};
-let TOTAL_BEATS = 0;
-for (const [name, len] of TL.sections) { STARTS[name] = TOTAL_BEATS; TOTAL_BEATS += len; }
-const TOTAL = Math.round(TOTAL_BEATS * BEAT * FPS);
-// "coins:4.5" 表示 coins 段起点后 4.5 拍；纯数字为绝对拍数
-const beatOf = s => (s.includes(':') ? STARTS[s.split(':')[0]] + Number(s.split(':')[1]) : Number(s));
+const TOTAL = Math.round(TL.totalBeats * BEAT * FPS);
 
 function serve() {
   const types = {
@@ -65,7 +60,7 @@ async function stills(browser, port, beats) {
   for (const b of beats) {
     const i = Math.round(b * BEAT * FPS);
     const buf = await frame(page, i);
-    const out = path.join(dir, `b${b.toFixed(2).padStart(7, '0')}.jpg`);
+    const out = path.join(dir, `b${String(b).padStart(6, '0')}.jpg`);
     fs.writeFileSync(out, buf);
     console.log(out);
   }
@@ -125,7 +120,7 @@ async function video(browser, port) {
   const port = srv.address().port;
   const browser = await chromium.launch({ args: ['--disable-gpu', '--font-render-hinting=none'] });
   try {
-    if (mode === 'stills') await stills(browser, port, args.map(beatOf));
+    if (mode === 'stills') await stills(browser, port, args.map(Number));
     else if (mode === 'video') await video(browser, port);
     else throw new Error('用法：node render.js stills <拍...> | video');
   } finally {

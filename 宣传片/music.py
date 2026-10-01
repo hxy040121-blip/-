@@ -18,37 +18,7 @@ from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
 SR = 48000
 HERE = os.path.dirname(os.path.abspath(__file__))
-REL = ("b", "until", "decodeEnd", "inB", "flipB", "tagB", "fadeB", "coinGone", "appear", "coinsAppear")
-
-
-def load_timeline():
-    """读 timeline.json，把带 sec 的条目从段内相对拍数换算成绝对拍数（与 scene.js 相同）。"""
-    tl = json.load(open(os.path.join(HERE, "timeline.json"), encoding="utf-8"))
-    start, secs, pos = {}, {}, 0
-    for name, ln in tl["sections"]:
-        start[name], secs[name] = pos, [pos, pos + ln]
-        pos += ln
-    tl["sections"], tl["totalBeats"] = secs, pos
-
-    def walk(o):
-        if isinstance(o, list):
-            for v in o:
-                walk(v)
-        elif isinstance(o, dict):
-            if isinstance(o.get("sec"), str):
-                base = start[o["sec"]]
-                for k in REL:
-                    if isinstance(o.get(k), (int, float)):
-                        o[k] += base
-                if isinstance(o.get("times"), list):
-                    o["times"] = [t + base for t in o["times"]]
-            for v in o.values():
-                walk(v)
-    walk(tl)
-    return tl
-
-
-TL = load_timeline()
+TL = json.load(open(os.path.join(HERE, "timeline.json"), encoding="utf-8"))
 BEAT = 60.0 / TL["bpm"]
 TOTAL_BEATS = TL["totalBeats"]
 N = int((TOTAL_BEATS * BEAT + 1.0) * SR)
@@ -139,9 +109,7 @@ def seat_pan(seat):
 
 class Mixer:
     def __init__(self):
-        # post 不经过静音区与混响，用来放静场里仍要听见的心跳、底噪
-        self.bus = {k: np.zeros((N, 2)) for k in ("drums", "music", "sfx", "pad", "post")}
-        self.mutes = []
+        self.bus = {k: np.zeros((N, 2)) for k in ("drums", "music", "sfx", "pad")}
         self.hall = np.zeros((N, 2))
         self.room = np.zeros((N, 2))
         self.kicks = []
@@ -439,32 +407,6 @@ def rumble(dur):
     return filt(rng.standard_normal(int(dur * SR)), "low", 110, 4) * 3
 
 
-def bone_click():
-    """骨头相碰的干脆木质声。"""
-    t = tarr(.12)
-    nz = filt(rng.standard_normal(len(t)) * np.exp(-t / .004), "band", [500, 3000])
-    ping = np.sin(2 * np.pi * rng.uniform(600, 900) * t) * np.exp(-t / .025) * .6
-    return nz + ping
-
-
-def coin_ring(dur=2.2):
-    """金币落定的余音：不谐和的金属泛音。"""
-    t = tarr(dur)
-    x = sum(a * np.sin(2 * np.pi * f * t + rng.uniform(0, 6.28)) * np.exp(-t / d)
-            for f, a, d in [(2093, .6, .9), (3378, .4, .6), (5231, .3, .4), (6901, .2, .25), (8200, .1, .15)])
-    x[:int(.004 * SR)] += rng.standard_normal(int(.004 * SR)) * .5
-    return x
-
-
-def coin_spin(dur):
-    """抛起后翻转的金币：泛音随转速一明一暗，越转越慢。"""
-    t = tarr(dur)
-    rate = 22 * (1 - t / dur) ** 1.5 + 3
-    am = .5 + .5 * np.sin(2 * np.pi * np.cumsum(rate) / SR)
-    x = sum(a * np.sin(2 * np.pi * f * t) for f, a in [(2093, .5), (3378, .3), (5231, .2)])
-    return x * am * np.minimum(1, t / .05) * .5
-
-
 # ---------------------------------------------------------------- 混响
 
 def make_ir(dur, rt60, lp=6000):
@@ -589,96 +531,56 @@ def type_blips(b, text, end_b, pitch=1050):
 
 
 # ---------------------------------------------------------------- 编排
-# 所有时间都写成“某段起点 + 段内拍数”，改 timeline.json 的段落长度时这里自动跟着移。
 
 def compose():
-    S = {k: v[0] for k, v in TL["sections"].items()}
-    E = {k: v[1] for k, v in TL["sections"].items()}
+    S = TL["sections"]
 
-    # ===== 钟 → 序 → 醒来：持续的低音与钟表滴答 =====
-    span = E["table"] - S["clock"] + 1
-    d = drone(hz("D2"), tb(span))
+    # ===== 序：钟 =====
+    d = drone(hz("D2"), tb(33))
     d *= np.clip(np.arange(len(d)) / (tb(6) * SR), 0, 1) ** 2
-    MX.add("pad", tb(S["clock"]), d, .22, hall=.3)
-    MX.add("pad", tb(S["clock"]), rumble(tb(span - 1)) * np.clip(np.arange(int(tb(span - 1) * SR)) / (tb(4) * SR), 0, 1), .08)
-    bell_b = S["intro"]
-    for b in range(S["clock"], bell_b):
+    MX.add("pad", 0, d, .22, hall=.3)
+    MX.add("pad", 0, rumble(tb(32)) * np.clip(np.arange(int(tb(32) * SR)) / (tb(4) * SR), 0, 1), .08)
+    for b in range(0, 8):
         MX.add("sfx", tb(b), tick(b % 2 == 0), .5, .1 if b % 2 else -.1, room=.4, hall=.15)
-    MX.add("sfx", tb(bell_b) - 1.6, reverse_swell(1.6), .35, hall=.2)
-    MX.add("music", tb(bell_b), bell(hz("D3")), .55, 0, hall=.6)
-    MX.add("music", tb(bell_b), impact(3) * .4, 1.0)
-    for b in range(bell_b, E["table"]):
+    MX.add("sfx", tb(8) - 1.6, reverse_swell(1.6), .35, hall=.2)
+    MX.add("music", tb(8), bell(hz("D3")), .55, 0, hall=.6)
+    MX.add("music", tb(8), impact(3) * .4, 1.0)
+    for b in range(8, 32):
         MX.add("sfx", tb(b), tick(b % 2 == 0), .2, .1 if b % 2 else -.1, room=.4, hall=.1)
-    play_chime(bell_b + 2, ["A5"], gain=.22)
-    play_chime(bell_b + 4, ["F5"], gain=.2)
-    play_chime(bell_b + 6, ["E5", "C#5"], step=1, gain=.2)
-    n = E["table"] - bell_b
-    MX.add("pad", tb(bell_b), drone(hz("A2"), tb(n)) * ar(int(tb(n) * SR), 3, 2), .1, hall=.3)
+    play_chime(10, ["A5"], gain=.22)
+    play_chime(12, ["F5"], gain=.2)
+    play_chime(14, ["E5", "C#5"], step=1, gain=.2)
+    MX.add("pad", tb(8), drone(hz("A2"), tb(24)) * ar(int(tb(24) * SR), 3, 2), .1, hall=.3)
 
-    t0 = S["table"]
+    # ===== 醒来：一次三席 =====
     groups = [["D5", "F5", "A5"], ["E5", "G5", "Bb5"], ["F5", "A5", "D6"], ["E5", "G5", "C#6"], ["A4", "D5", "F5"]]
     for wg, notes in zip(TL["wakeGroups"], groups):
         for i, (seat, nme) in enumerate(zip(wg["seats"], notes)):
             MX.add("music", tb(wg["b"] + i * .5), musicbox(hz(nme)), .3, seat_pan(seat), hall=.55)
-    play_theme(t0 + 10, gain=.28, upto=6)
-    MX.add("sfx", tb(t0 + 8), grain_shimmer(tb(4), 45), .07, hall=.3)
-    MX.add("pad", tb(t0 + 8), screech(tb(8), ("Eb5", "D5")), .04, hall=.4)
-    MX.add("sfx", tb(t0 + 12), riser(tb(4)), .18, hall=.2)
-    for b in range(t0 + 12, t0 + 16):
-        MX.add("drums", tb(b), heartbeat(), .55)
-    MX.add("sfx", tb(S["mansion"]) - 1.2, reverse_swell(1.2), .3)
-
-    # ===== 洋馆的异常：四个镜头 =====
-    m = S["mansion"]
-    MX.add("music", tb(m), impact(3), .35)
-    MX.add("pad", tb(m), pad(["D3", "Eb3", "A3"], tb(16.5), soft=3, a=1.0, r=1.5), .12, hall=.5)
-    MX.add("pad", tb(m), drone(hz("D2"), tb(16.5)) * ar(int(tb(16.5) * SR), .5, 1.0), .14, hall=.3)
-    for b in range(m, m + 16, 2):
-        MX.add("drums", tb(b), kick(90, 38, .5, .3) * .6, 1.0, hall=.15)
-        MX.kicks.append(tb(b))
-    # 一：假窗，墙上的钟一日走完
-    for i in range(16):
-        MX.add("sfx", tb(m + i * .25), tick(i % 2 == 0), .12, .5, room=.3)
-    MX.add("pad", tb(m), pad(["A3", "D4", "E4"], tb(4), soft=4, a=1.2, r=1.4), .1, hall=.6)
-    # 二：骨架
-    for k in (4, 8, 12):
-        MX.add("sfx", tb(m + k) - .8, reverse_swell(.8), .22)
-        MX.add("music", tb(m + k), impact(2.5), .22)
-    for i in range(12):
-        MX.add("sfx", tb(m + 4 + rng.uniform(.2, 3.6)), bone_click(), .22, rng.uniform(-.6, .6), hall=.35)
-    # 三：双月挂毯
-    MX.add("music", tb(m + 8.2), bell(hz("A4"), 6), .22, -.35, hall=.7)
-    MX.add("music", tb(m + 9.6), bell(hz("D3"), 6), .28, .35, hall=.7)
-    MX.add("sfx", tb(m + 8), grain_shimmer(tb(4), 35), .06, hall=.5)
-    # 四：八位无名观测者
-    for i, nme in enumerate(["D4", "E4", "F4", "G4", "A4", "Bb4", "C#5", "D5"]):
-        MX.add("music", tb(m + 12 + i * .22), pluck(hz(nme), .8, 1.2), .12, (i - 3.5) / 5, hall=.5)
-    MX.add("pad", tb(m + 15), pad(["D4", "Eb4", "Ab4"], tb(1.2), soft=3, a=.8, r=.2), .16, hall=.4)
-    for p in TL["placards"]:
-        n = len(p["text"])
-        for i, c in enumerate(p["text"]):
-            if c in " 　·":
-                continue
-            MX.add("sfx", tb(p["b"] + (p["decodeEnd"] - p["b"]) * (i + 1) / n), blip(760 + 30 * (i % 6)), .06, room=.3)
-    MX.add("sfx", tb(S["host"]) - 1.2, reverse_swell(1.2), .3)
+    play_theme(26, gain=.28, upto=6)
+    MX.add("sfx", tb(24), grain_shimmer(tb(4), 45), .07, hall=.3)
+    MX.add("pad", tb(24), screech(tb(8), ("Eb5", "D5")) , .04, hall=.4)
+    MX.add("sfx", tb(28), riser(tb(4)), .22, hall=.2)
+    for b in (28, 29, 30, 31):
+        MX.add("drums", tb(b), heartbeat(), .6)
+    MX.add("sfx", tb(32) - 1.2, reverse_swell(1.2), .3)
 
     # ===== 主持人：未知字形 =====
-    h = S["host"]
-    MX.add("music", tb(h), impact(3), .55)
-    MX.add("pad", tb(h), drone(hz("D2"), tb(8.5)) * ar(int(tb(8.5) * SR), .05, 1.0), .2, hall=.2)
-    groove(h, h + 8, [(h, "Dm"), (h + 4, "Bb")], kick_pat=(0, 2), snare_pat=(), hats=True, arp=False,
+    MX.add("music", tb(32), impact(3), .55)
+    MX.add("pad", tb(32), drone(hz("D2"), tb(8.5)) * ar(int(tb(8.5) * SR), .05, 1.0), .2, hall=.2)
+    groove(32, 40, [(32, "Dm"), (36, "Bb")], kick_pat=(0, 2), snare_pat=(), hats=True, arp=False,
            bass_step=.5, bass_gain=.3, kick_gain=.6)
-    for hl in TL["hostLines"]:
-        n = len(hl["text"])
-        MX.add("sfx", tb(hl["b"]), grain_shimmer(tb(hl["decodeEnd"] - hl["b"]), 70), .06, hall=.3)
+    for h in TL["hostLines"]:
+        n = len(h["text"])
+        MX.add("sfx", tb(h["b"]), grain_shimmer(tb(h["decodeEnd"] - h["b"]), 70), .06, hall=.3)
         for i in range(n):
-            if hl["text"][i] in "，。":
+            if h["text"][i] in "，。":
                 continue
-            MX.add("sfx", tb(hl["b"] + (hl["decodeEnd"] - hl["b"]) * (i + 1) / n), blip(700 + 25 * (i % 7)), .08, room=.3)
+            t = tb(h["b"]) + (tb(h["decodeEnd"]) - tb(h["b"])) * (i + 1) / n
+            MX.add("sfx", t, blip(700 + 25 * (i % 7)), .08, room=.3)
 
     # ===== 身份卡 =====
-    c = S["card"]
-    groove(c, c + 8, [(c, "Gm"), (c + 4, "A")], kick_pat=(0, 2), snare_pat=(3,), hats=True,
+    groove(40, 48, [(40, "Gm"), (44, "A")], kick_pat=(0, 2), snare_pat=(3,), hats=True,
            bass_step=.5, arp=True, arp_gain=.13, bass_gain=.34, kick_gain=.7)
     fc = TL["firstCard"]
     MX.add("sfx", tb(fc["inB"]), whoosh(.45), .25, hall=.2)
@@ -686,155 +588,120 @@ def compose():
     MX.add("sfx", tb(fc["flipB"]) + .12, mix(kick(90, 35, .6) * .7, tick() * .4), .7, hall=.3)
     MX.add("music", tb(fc["flipB"]) + .12, bell(hz("A2"), 5), .25, hall=.5)
 
-    f = S["flips"]
-    groove(f, f + 8, [(f, "Dm"), (f + 4, "Bb"), (f + 6, "A")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3),
+    # ===== 连翻 =====
+    groove(48, 56, [(48, "Dm"), (52, "Bb"), (54, "A")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3),
            hats=True, open_hats=True, bass_step=.25, arp=True, arp_gain=.15, stabs=(.5, 2.5))
     for i in range(len(TL["flipCards"])):
-        b = TL["flipStart"]["b"] + i
+        b = TL["flipStartB"] + i
         MX.add("sfx", tb(b), whoosh(.2), .14, (-1) ** i * .4)
         MX.add("sfx", tb(b + .5), tick(True), .5, (-1) ** i * .3, room=.3)
-
-    # ===== 金币 =====
-    k = S["coins"]
-    groove(k, k + 4, [(k, "Dm")], kick_pat=(0, 2), snare_pat=(3,), hats=True, bass_step=.5,
-           arp=True, arp_gain=.11, bass_gain=.3, kick_gain=.65)
-    cf = TL["coinFlip"]
-    MX.add("sfx", tb(cf["b"]), coin_spin(tb(cf["until"] - cf["b"])), .32, hall=.35)
-    MX.add("sfx", tb(cf["until"]), coin_ring(), .4, hall=.45)
-    groove(k + 4, k + 8, [(k + 4, "Bb"), (k + 6, "A")], kick_pat=(0, 2), snare_pat=(1, 3), hats=True,
-           bass_step=.25, arp=True, arp_gain=.13, bass_gain=.32)
-    pl = TL["plaque"]
-    for i in range(len(pl["rows"])):
-        MX.add("sfx", tb(pl["b"] + i * pl["step"]), blip(820 + 50 * i) * 1.4, .1, room=.3)
-    last = pl["b"] + (len(pl["rows"]) - 1) * pl["step"] + .2
-    MX.add("music", tb(last), mix(stab("Dm", .5), braam("D1", 2.5, .6)), .45, hall=.5)
-    MX.add("music", tb(last), bell(hz("D3"), 5), .3, hall=.6)
-    # 付款与交付：无声无光。整段切成静场，只剩底噪和心跳
-    MX.mutes.append((k + 8, S["commission"]))
-    MX.add("post", tb(k + 8), rumble(tb(4)), .03)
-    for b in (k + 10, k + 11):
-        MX.add("post", tb(b), heartbeat(), .5)
-    MX.add("post", tb(S["commission"]) - 1.0, reverse_swell(1.0), .4)
+    MX.add("sfx", tb(55), reverse_swell(tb(1)), .35)
 
     # ===== 受命者 =====
-    s = S["commission"]
-    MX.add("music", tb(s), braam("D1", 4.5), .5, hall=.35)
-    MX.add("music", tb(s), impact(3), .6)
-    MX.add("pad", tb(s), screech(tb(4.2)), .1, hall=.5)
-    MX.add("pad", tb(s), drone(hz("D1"), tb(4)) * ar(int(tb(4) * SR), .01, .3), .25)
+    MX.add("music", tb(56), braam("D1", 4.5), .5, hall=.35)
+    MX.add("music", tb(56), impact(3), .6)
+    MX.add("pad", tb(56), screech(tb(4.2)), .1, hall=.5)
+    MX.add("pad", tb(56), drone(hz("D1"), tb(4)) * ar(int(tb(4) * SR), .01, .3), .25)
 
     # ===== 二十四小时 =====
-    s = S["countdown"]
-    MX.add("drums", tb(s), mix(kick() * .9, snare() * .5), 1.0, hall=.2)
-    MX.add("music", tb(s), bass(hz("A1"), tb(4)) * np.linspace(1, .6, int(tb(4) * SR)), .35)
+    MX.add("drums", tb(60), mix(kick() * .9, snare() * .5), 1.0, hall=.2)
+    MX.add("music", tb(60), bass(hz("A1"), tb(4)) * np.linspace(1, .6, int(tb(4) * SR)), .35)
     for i in range(12):
-        MX.add("sfx", tb(s + i * .25), tick(i % 2 == 0), .4, room=.2)
+        MX.add("sfx", tb(60 + i * .25), tick(i % 2 == 0), .4, room=.2)
     for i in range(8):
-        MX.add("sfx", tb(s + 3 + i * .125), tick(i % 2 == 0), .45, room=.2)
-    MX.add("sfx", tb(s), riser(tb(4)), .3)
-    roll(s + 2, s + 4, .05, .45, 8)
-    for b in range(s, s + 4):
+        MX.add("sfx", tb(63 + i * .125), tick(i % 2 == 0), .45, room=.2)
+    MX.add("sfx", tb(60), riser(tb(4)), .3)
+    roll(62, 64, .05, .45, 8)
+    for b in (60, 61, 62, 63):
         MX.add("drums", tb(b), kick() * .6, 1.0)
         MX.kicks.append(tb(b))
 
     # ===== 黑暗 =====
-    s = S["blackout"]
-    MX.add("pad", tb(s), drone(hz("D1"), tb(8)) * ar(int(tb(8) * SR), .5, 1), .16)
+    MX.add("pad", tb(64), drone(hz("D1"), tb(8)) * ar(int(tb(8) * SR), .5, 1), .16)
     for tx in TL["texts"]:
         if tx.get("blip"):
             type_blips(tx["b"], tx["text"], tx["until"])
-    MX.add("sfx", tb(s + 2), power_down(), .55, hall=.3)
-    for b in range(s + 2, S["door"] + 4):
-        MX.add("drums", tb(b), heartbeat(), .75 if b < S["door"] else .85)
+    MX.add("sfx", tb(66), power_down(), .55, hall=.3)
+    for b in (66, 67, 68, 69, 70, 71):
+        MX.add("drums", tb(b), heartbeat(), .75 if b < 68 else .85)
 
     # ===== 典狱长的门 =====
-    s = S["door"]
-    MX.add("sfx", tb(s), door_slam(), .95, hall=.45)
-    MX.add("pad", tb(s + 2), screech(tb(2)), .09, hall=.4)
-    MX.add("sfx", tb(S["body"]) - 1.4, reverse_swell(1.4), .4)
+    MX.add("sfx", tb(68), door_slam(), .95, hall=.45)
+    MX.add("pad", tb(70), screech(tb(2)), .09, hall=.4)
+    MX.add("sfx", tb(72) - 1.4, reverse_swell(1.4), .4)
 
     # ===== 发现尸体 =====
-    s = S["body"]
-    MX.add("music", tb(s), braam("D1", 6), .7, hall=.35)
-    MX.add("music", tb(s), impact(3), .8)
-    MX.add("music", tb(s), bell(hz("D3"), 8), .4, hall=.6)
-    MX.add("music", tb(s), stab("Dm", .5) + stab("A", .5) * .6, .3, hall=.6)
+    MX.add("music", tb(72), braam("D1", 6), .7, hall=.35)
+    MX.add("music", tb(72), impact(3), .8)
+    MX.add("music", tb(72), bell(hz("D3"), 8), .4, hall=.6)
+    MX.add("music", tb(72), stab("Dm", .5) + stab("A", .5) * .6, .3, hall=.6)
     for i in range(8):
-        MX.add("sfx", tb(s + 2 + i * .25), tick(i % 2 == 0), .25, room=.3)
+        MX.add("sfx", tb(74 + i * .25), tick(i % 2 == 0), .25, room=.3)
 
     # ===== 调查 =====
-    s = S["investigate"]
-    groove(s, s + 8, [(s, "Dm"), (s + 4, "Bb"), (s + 6, "A")], kick_pat=(0, 2), snare_pat=(), hats=False,
+    groove(76, 84, [(76, "Dm"), (80, "Bb"), (82, "A")], kick_pat=(0, 2), snare_pat=(), hats=False,
            bass_step=.25, arp=False, bass_gain=.36, kick_gain=.75)
     for i in range(32):
-        MX.add("sfx", tb(s + i * .25), tick(i % 2 == 0), .28 if i % 2 == 0 else .18, room=.25)
+        MX.add("sfx", tb(76 + i * .25), tick(i % 2 == 0), .28 if i % 2 == 0 else .18, room=.25)
     c1 = TL["clues1"]
     for i, _ in enumerate(c1["words"]):
         MX.add("sfx", tb(c1["b"] + i * c1["step"]), mix(glitch(.12) * .5, kick(200, 60, .2) * .4), .45, (-1) ** i * .3)
     c2 = TL["clues2"]
     for i, _ in enumerate(c2["words"]):
         MX.add("sfx", tb(c2["b"] + i * c2["step"]), mix(blip(1500 + 120 * i) * 1.5, tick() * .5), .35, (-1) ** i * .4)
-    MX.add("pad", tb(s + 2), pad(["D4", "Eb4", "A4"], tb(6), soft=3, a=2, r=1), .12, hall=.4)
-    roll(s + 6, s + 8, .04, .5, 8)
-    MX.add("sfx", tb(s + 6), riser(tb(2)), .3)
+    MX.add("pad", tb(78), pad(["D4", "Eb4", "A4"], tb(6), soft=3, a=2, r=1), .12, hall=.4)
+    roll(82, 84, .04, .5, 8)
+    MX.add("sfx", tb(82), riser(tb(2)), .3)
 
     # ===== 开庭 =====
-    s = S["trialOpen"]
-    MX.add("music", tb(s), braam("D1", 5), .6, hall=.35)
-    MX.add("music", tb(s), impact(3), .7)
-    MX.add("music", tb(s), bell(hz("D3"), 8), .35, hall=.6)
-    groove(s, s + 4, [(s, "Dm")], kick_pat=(0, 2), snare_pat=(), hats=False, arp=False,
+    MX.add("music", tb(84), braam("D1", 5), .6, hall=.35)
+    MX.add("music", tb(84), impact(3), .7)
+    MX.add("music", tb(84), bell(hz("D3"), 8), .35, hall=.6)
+    groove(84, 88, [(84, "Dm")], kick_pat=(0, 2), snare_pat=(), hats=False, arp=False,
            bass_step=1, bass_gain=.3, kick_gain=.6)
-    MX.add("pad", tb(s), pad(["D3", "A3", "E4", "F4"], tb(4.2), soft=3, a=.8, r=.6), .14, hall=.5)
-    MX.add("sfx", tb(s + 1.5), grain_shimmer(tb(2), 120) * np.linspace(1, 0, int(tb(2) * SR)), .12, hall=.5)
+    MX.add("pad", tb(84), pad(["D3", "A3", "E4", "F4"], tb(4.2), soft=3, a=.8, r=.6), .14, hall=.5)
+    MX.add("sfx", tb(85.5), grain_shimmer(tb(2), 120) * np.linspace(1, 0, int(tb(2) * SR)), .12, hall=.5)
 
     # ===== 辩论 =====
-    s = S["debate"]
-    groove(s, s + 8, [(s, "Dm"), (s + 4, "Bb")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3), hats=True,
+    groove(88, 96, [(88, "Dm"), (92, "Bb")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3), hats=True,
            open_hats=True, bass_step=.25, arp=True, arp_gain=.15, stabs=(1.5, 3.5))
     for dl in TL["debate"]:
         MX.add("sfx", tb(dl["b"]), mix(whoosh(.18) * .5, blip(820) * .8), .3, seat_pan(dl["seat"]), room=.2)
 
     # ===== 投票 =====
-    s = S["vote"]
-    groove(s, s + 1, [(s, "Gm")], kick_pat=(0,), snare_pat=(), hats=False, arp=False, bass_step=1, bass_gain=.3)
-    groove(s + 1, s + 8, [(s + 1, "Gm"), (s + 4, "A")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3), hats=True,
+    groove(96, 97, [(96, "Gm")], kick_pat=(0,), snare_pat=(), hats=False, arp=False, bass_step=1, bass_gain=.3)
+    groove(97, 104, [(97, "Gm"), (100, "A")], kick_pat=(0, 1, 2, 3), snare_pat=(1, 3), hats=True,
            bass_step=.25, arp=True, arp_gain=.13)
     v = TL["votes"]
     counts = {}
     for i, tgt in enumerate(v["targets"]):
         counts[tgt] = counts.get(tgt, 0) + 1
-        MX.add("sfx", tb(v["b"] + i * v["step"]), blip(520 * 2 ** ((counts[tgt] - 1) * 2 / 12)) * 2, .22, seat_pan(i + 1), room=.2)
+        f = 520 * 2 ** ((counts[tgt] - 1) * 2 / 12)
+        MX.add("sfx", tb(v["b"] + i * v["step"]), blip(f) * 2, .22, seat_pan(i + 1), room=.2)
     for hm in TL["hiddenMods"]:
         MX.add("sfx", tb(hm["b"]), mod_jump() if hm["delta"] > 0 else mod_jump()[::-1], .3, seat_pan(hm["seat"]), hall=.4)
-    MX.add("sfx", tb(s + 7), reverse_swell(tb(1)), .35)
+    MX.add("sfx", tb(103), reverse_swell(tb(1)), .35)
 
     # ===== 判决 =====
-    s = S["verdict"]
-    vb = TL["verdict"]["b"]
-    MX.add("sfx", tb(s), glitch(tb(vb - s)), .4)
+    MX.add("sfx", tb(104), glitch(tb(1)), .4)
+    vb = TL["verdictB"]
     MX.add("music", tb(vb), braam("D1", 5), .65, hall=.35)
     MX.add("music", tb(vb), impact(3), .75)
     MX.add("music", tb(vb), stab("Dm", .6), .35, hall=.6)
-    MX.add("pad", tb(vb), drone(hz("D1"), tb(E["verdict"] - vb + .2)) * ar(int(tb(E["verdict"] - vb + .2) * SR), .3, .4), .18)
-    for b in (s + 2, s + 3):
+    MX.add("pad", tb(vb), drone(hz("D1"), tb(3.2)) * ar(int(tb(3.2) * SR), .3, .4), .18)
+    for b in (106, 107):
         MX.add("drums", tb(b), heartbeat(), .6)
 
-    # ===== 真凶逃过；书桌上无声多出十枚金币 =====
-    s, dk = S["escape"], TL["escapeDesk"]["b"]
-    groove(s, dk, [(s, "Bb")], kick_pat=(0, 2), snare_pat=(3,), hats=True, bass_step=.25,
+    # ===== 真凶逃过 =====
+    groove(108, 112, [(108, "Bb")], kick_pat=(0, 2), snare_pat=(3,), hats=True, bass_step=.25,
            arp=True, arp_gain=.2, lowpass=900)
-    MX.add("pad", tb(s), screech(tb(dk - s), ("D5", "A5")), .06, hall=.4)
-    MX.mutes.append((dk, E["escape"]))
-    MX.add("post", tb(dk), drone(hz("D2"), tb(E["escape"] - dk)) * ar(int(tb(E["escape"] - dk) * SR), .05, .3), .12)
-    MX.add("post", tb(dk + 1.5), heartbeat(), .45)
-    MX.add("post", tb(E["escape"] - 1), reverse_swell(tb(1)), .4)
+    MX.add("pad", tb(108), screech(tb(4), ("D5", "A5")), .06, hall=.4)
+    MX.add("sfx", tb(111), reverse_swell(tb(1)), .4)
 
     # ===== 群像 =====
-    s = S["names"]
-    groove(s, s + 8, [(s, "Dm"), (s + 2, "Bb"), (s + 4, "Gm"), (s + 6, "A")], kick_pat=(0, 1, 2, 3),
+    groove(112, 120, [(112, "Dm"), (114, "Bb"), (116, "Gm"), (118, "A")], kick_pat=(0, 1, 2, 3),
            snare_pat=(1, 3), hats=True, open_hats=True, bass_step=.25, arp=True, arp_gain=.12, stabs=(.5, 2.5))
-    play_theme(s, gain=.24, octave=0, hall=.3, stretch=.5, voice="lead")
+    play_theme(112, gain=.24, octave=0, hall=.3, stretch=.5, voice="lead")
     nm = TL["names"]
     for i in range(len(nm["list"])):
         if i < nm["slowCount"]:
@@ -843,25 +710,23 @@ def compose():
         else:
             b = nm["b"] + nm["slowCount"] * nm["slow"] + (i - nm["slowCount"]) * nm["fast"]
             MX.add("sfx", tb(b), mix(tick(i % 2 == 0) * .6, blip(900 + 40 * i) * .5), .4, (-1) ** i * .3)
-    roll(s + 6, s + 8, .05, .55, 8)
-    MX.add("sfx", tb(s + 4), riser(tb(4)), .32)
+    roll(118, 120, .05, .55, 8)
+    MX.add("sfx", tb(116), riser(tb(4)), .32)
 
     # ===== 黑钻石封墙 =====
-    s = S["wall"]
-    MX.add("sfx", tb(s + .2), creak(1.6), .25, -.2, hall=.5)
-    MX.add("music", tb(s + 1.5), impact(3.5), .55, hall=.3)
-    MX.add("pad", tb(s), drone(hz("D1"), tb(4.5)) * ar(int(tb(4.5) * SR), 1.0, 1.0), .2)
-    MX.add("pad", tb(s + 1.5), screech(tb(2.5), ("A6", "Bb6")), .03, hall=.6)
+    MX.add("sfx", tb(120.2), creak(1.6), .25, -.2, hall=.5)
+    MX.add("music", tb(121.5), impact(3.5), .55, hall=.3)
+    MX.add("pad", tb(120), drone(hz("D1"), tb(4.5)) * ar(int(tb(4.5) * SR), 1.0, 1.0), .2)
+    MX.add("pad", tb(121.5), screech(tb(2.5), ("A6", "Bb6")), .03, hall=.6)
 
     # ===== 愿望 =====
-    s = S["wish"]
-    play_theme(s, gain=.28, hall=.75, upto=8)
-    MX.add("pad", tb(s), pad(["D3", "A3", "F4"], tb(4.5), soft=3, a=2, r=1.5), .13, hall=.6)
+    play_theme(124, gain=.28, hall=.75, upto=8)
+    MX.add("pad", tb(124), pad(["D3", "A3", "F4"], tb(4.5), soft=3, a=2, r=1.5), .13, hall=.6)
     so = TL["seatOff"]
     for seat, b in zip(so["order"], so["times"]):
         MX.add("sfx", tb(b), seat_out(), .3, seat_pan(seat), hall=.3)
-    MX.add("pad", tb(s + 4), pad(["D3", "A3", "D4", "F#4", "A4"], tb(6), soft=5, a=1.2, r=2.5, vib=.004), .2, hall=.7)
-    play_chime(s + 4, ["F#5", "A5", "D6"], step=.5, gain=.22, hall=.8)
+    MX.add("pad", tb(128), pad(["D3", "A3", "D4", "F#4", "A4"], tb(6), soft=5, a=1.2, r=2.5, vib=.004), .2, hall=.7)
+    play_chime(128, ["F#5", "A5", "D6"], step=.5, gain=.22, hall=.8)
 
     # ===== 片名 =====
     tt = TL["title"]
@@ -871,8 +736,8 @@ def compose():
     MX.add("music", tb(tt["b"]), bell(hz("D3"), 11), .5, hall=.7)
     MX.add("pad", tb(tt["b"]), pad(["D2", "A2", "D3", "F3", "A3"], tb(12), soft=3, a=.05, r=5), .2, hall=.6)
     MX.add("music", tb(tt["tagB"]), musicbox(hz("A5"), 4), .22, hall=.8)
-    MX.add("music", tb(tt["b"] + 6), musicbox(hz("D5"), 4), .2, hall=.85)
-    MX.add("sfx", tb(tt["b"] + 10), tick(True), .3, hall=.6)
+    MX.add("music", tb(138), musicbox(hz("D5"), 4), .2, hall=.85)
+    MX.add("sfx", tb(142), tick(True), .3, hall=.6)
 
 
 # ---------------------------------------------------------------- 母带
@@ -907,13 +772,11 @@ def compress(x, thresh=.35, ratio=3.0):
 
 
 # 各段目标响度（dB，相对值）：前奏压低，庭审与群像最响，片尾回落。
-# 值为列表时按段内区间分别设定，None 表示该区间不调（例如刻意留白的静场）。
 TARGETS = {
-    "clock": -29, "intro": -25, "table": -23, "mansion": -22, "host": -21, "card": -19, "flips": -17,
-    "coins": [(0, 8, -18), (8, 12, None)],
+    "clock": -29, "intro": -25, "table": -23, "host": -21, "card": -19, "flips": -17,
     "commission": -18, "countdown": -16, "blackout": -25, "door": -18, "body": -16,
     "investigate": -18, "trialOpen": -17, "debate": -15, "vote": -15, "verdict": -16.5,
-    "escape": [(0, 4, -18), (4, 8, None)], "names": -14, "wall": -22, "wish": -21, "title": -16,
+    "escape": -18, "names": -14, "wall": -22, "wish": -21, "title": -16,
 }
 
 
@@ -927,11 +790,9 @@ def automation(out):
     g = np.zeros(len(out))
     ramp = int(.12 * SR)
     for name, (a, b) in TL["sections"].items():
-        zones = TARGETS[name] if isinstance(TARGETS[name], list) else [(0, b - a, TARGETS[name])]
-        for z0, z1, target in zones:
-            i0, i1 = int(tb(a + z0) * SR), int(tb(a + z1) * SR)
-            if target is not None:
-                g[i0:i1] = np.clip(target - loudness(out[i0:i1]), -14, 10)
+        i0, i1 = int(tb(a) * SR), int(tb(b) * SR)
+        db = np.clip(TARGETS[name] - loudness(out[i0:i1]), -14, 10)
+        g[i0:i1] = db
     # 平滑：每个分界点前 0.12 秒内过渡
     k = np.ones(ramp) / ramp
     g = np.convolve(np.pad(g, (0, ramp - 1), mode="edge"), k, mode="valid")[:len(out)]
@@ -949,19 +810,6 @@ def limit(x, ceiling):
     return x * g[:, None]
 
 
-def gate():
-    """静音区：起点 30 毫秒内切到 -40 dB，终点前 0.15 秒放开。"""
-    g = np.ones(N)
-    for b0, b1 in MX.mutes:
-        i0, i1 = int(tb(b0) * SR), int(tb(b1) * SR)
-        env = np.full(i1 - i0, 10 ** (-40 / 20))
-        a, r = int(.03 * SR), int(.15 * SR)
-        env[:a] = np.linspace(1, env[0], a)
-        env[-r:] = np.linspace(env[0], 1, r)
-        g[i0:i1] = np.minimum(g[i0:i1], env)
-    return g
-
-
 def master():
     sc = sidechain()
     dry = MX.bus["drums"] + MX.bus["sfx"] + (MX.bus["music"] + filt(MX.bus["pad"], "high", 55)) * sc
@@ -971,7 +819,7 @@ def master():
     for c in range(2):
         wet[:, c] += signal.fftconvolve(MX.hall[:, c], hall[:, c])[:N] * .9
         wet[:, c] += signal.fftconvolve(MX.room[:, c], room[:, c])[:N] * .6
-    out = (dry + wet) * gate()[:, None] + MX.bus["post"]
+    out = dry + wet
     out = filt(out, "high", 28)
     out = out - .3 * filt(out, "low", 100)
     out = automation(out)
